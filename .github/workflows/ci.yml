@@ -1,9 +1,8 @@
 name: CI
-
 on: push
 
 jobs:
-  test:
+  coverage:
     runs-on: ubuntu-latest
     
     steps:
@@ -11,21 +10,77 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Install gcovr
+    - name: Install tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y g++ cmake python3-pip
+        sudo apt-get install -y g++ cmake python3-pip lcov
         pip3 install gcovr
     
-    - name: Build
+    - name: Build with coverage
       run: |
-        mkdir build && cd build
-        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage"
-        make && ./banking_tests
-        cd ..
+        rm -rf build
+        mkdir -p build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        make -j2
     
-    - name: Coverage
+    - name: Run tests
       run: |
         cd build
-        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --txt
-        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --txt | grep -q "100%" && echo "✅ 100% coverage!" || (echo "❌ Not 100%" && exit 1)
+        ./banking_tests
+        # Показываем где находятся .gcda файлы
+        find . -name "*.gcda" -ls
+    
+    - name: Generate coverage report
+      run: |
+        cd build
+        # Запускаем gcovr из директории build, указывая корень проекта
+        gcovr --root .. \
+              --gcov-executable gcov-10 \
+              --exclude '.*/third-party/.*' \
+              --exclude '.*/tests/.*' \
+              --exclude '.*/build/.*' \
+              --txt
+        # Сохраняем результат в переменную
+        gcovr --root .. \
+              --gcov-executable gcov-10 \
+              --exclude '.*/third-party/.*' \
+              --exclude '.*/tests/.*' \
+              --exclude '.*/build/.*' \
+              --txt > coverage.txt
+        cat coverage.txt
+    
+    - name: Check 100% coverage
+      run: |
+        cd build
+        # Получаем процент покрытия из отчета
+        COVERAGE=$(gcovr --root .. \
+                        --gcov-executable gcov-10 \
+                        --exclude '.*/third-party/.*' \
+                        --exclude '.*/tests/.*' \
+                        --exclude '.*/build/.*' \
+                        --txt | grep "TOTAL" | awk '{print $4}' | sed 's/%//')
+        
+        echo "Total coverage: ${COVERAGE}%"
+        
+        # Получаем покрытие для каждого файла
+        gcovr --root .. \
+              --gcov-executable gcov-10 \
+              --filter '.*/banking/Account.cpp' \
+              --txt
+        
+        gcovr --root .. \
+              --gcov-executable gcov-10 \
+              --filter '.*/banking/Transaction.cpp' \
+              --txt
+        
+        # Проверяем что покрытие 100%
+        if [ "$COVERAGE" = "100" ]; then
+          echo "✅✅✅ Success: 100% code coverage! ✅✅✅"
+          exit 0
+        else
+          echo "❌ Coverage is ${COVERAGE}%, expected 100%"
+          exit 1
+        fi
+
