@@ -4,46 +4,24 @@ on: push
 jobs:
   test:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: true
-    
-    - name: Install
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y lcov g++-10 cmake
-    
-    - name: Configure
-      run: |
-        rm -rf build
-        mkdir build
-        cd build
-        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage"
-    
-    - name: Build
-      run: |
-        cd build
-        make -j2
-    
-    - name: Test
-      run: |
-        cd build
-        ./banking_tests
-    
-    - name: Coverage collect
-      run: |
-        cd build
-        lcov --capture --directory . --output-file coverage.info --no-external
-        lcov --remove coverage.info '*/third-party/*' -o coverage.info
-        lcov --remove coverage.info '*/tests/*' -o coverage.info
-    
-    - name: Coverage check
-      run: |
-        cd build
-        lcov --list coverage.info
-        lcov --list coverage.info | grep "banking/Account.cpp" | grep "100.0%"
-        lcov --list coverage.info | grep "banking/Transaction.cpp" | grep "100.0%"
-        echo "🎉 100% coverage!"
+      - uses: actions/checkout@v4
+      - name: Install
+        run: sudo apt-get update && sudo apt-get install -y lcov g++ cmake
+      - name: Build
+        run: |
+          mkdir build && cd build
+          cmake .. -DBUILD_TESTS=ON
+          make -j2 && ./banking_tests
+          cd ..
+      - name: Coverage
+        run: |
+          cd build
+          lcov --capture --directory . --output-file coverage.info --no-external
+          lcov --remove coverage.info '*/_deps/*' -o coverage.info
+          lcov --remove coverage.info '*/tests/*' -o coverage.info
+          lcov --list coverage.info | grep -E "Account|Transaction"
+          lcov --list coverage.info | grep "banking/Account.cpp" | grep "100.0%"
+          lcov --list coverage.info | grep "banking/Transaction.cpp" | grep "100.0%"
+          echo "✅ 100% coverage!"
+
