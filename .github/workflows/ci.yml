@@ -1,0 +1,99 @@
+name: CI with Coverage
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lcov g++-10
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 90
+        sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-10 90
+    
+    - name: Configure CMake
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+    
+    - name: Build
+      run: |
+        cd build
+        make -j2
+    
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure
+    
+    - name: Generate coverage report
+      run: |
+        cd build
+        ./banking_tests
+        cd ..
+        lcov --capture --directory . --output-file coverage.info --no-external --ignore-errors inconsistent
+        lcov --remove coverage.info '*/third-party/*' --output-file coverage.info --ignore-errors unused
+        lcov --remove coverage.info '*/tests/*' --output-file coverage.info --ignore-errors unused
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info --ignore-errors unused
+    
+    - name: Print coverage summary
+      run: |
+        lcov --summary coverage.info
+    
+    - name: Generate HTML report
+      run: |
+        genhtml coverage.info --output-directory coverage_report --ignore-errors source
+    
+    - name: Upload coverage report as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage_report/
+        retention-days: 7
+    
+    - name: Check coverage percentage
+      run: |
+        COVERAGE=$(lcov --summary coverage.info 2>&1 | grep "lines" | awk '{print $2}' | sed 's/%//')
+        echo "Coverage: ${COVERAGE}%"
+        if (( $(echo "$COVERAGE < 100" | bc -l) )); then
+          echo "❌ Coverage is ${COVERAGE}%, but expected 100%"
+          exit 1
+        else
+          echo "✅ Coverage is 100%!"
+        fi
+
+  deploy-coverage:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download coverage report
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage_report
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./coverage_report
+        destination_dir: coverage
+        keep_files: false
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy coverage report to GitHub Pages'

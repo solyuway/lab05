@@ -1,10 +1,10 @@
-Start testing: May 20 17:45 EDT
+Start testing: May 20 17:56 EDT
 ----------------------------------------------------------
 1/1 Testing: BankingTests
 1/1 Test: BankingTests
 Command: "/home/alex/solyuway/workspace/tasks/lab05/build/banking_tests"
 Directory: /home/alex/solyuway/workspace/tasks/lab05/build
-"BankingTests" start time: May 20 17:45 EDT
+"BankingTests" start time: May 20 17:56 EDT
 Output:
 ----------------------------------------------------------
 Running main() from /home/alex/solyuway/workspace/tasks/lab05/third-party/gtest/googletest/src/gtest_main.cc
@@ -46,14 +46,14 @@ Running main() from /home/alex/solyuway/workspace/tasks/lab05/third-party/gtest/
 [----------] 2 tests from TransactionTestWithMocks (0 ms total)
 
 [----------] Global test environment tear-down
-[==========] 13 tests from 3 test cases ran. (1 ms total)
+[==========] 13 tests from 3 test cases ran. (0 ms total)
 [  PASSED  ] 13 tests.
 <end of output>
 Test time =   0.01 sec
 ----------------------------------------------------------
 Test Passed.
-"BankingTests" end time: May 20 17:45 EDT
+"BankingTests" end time: May 20 17:56 EDT
 "BankingTests" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: May 20 17:45 EDT
+End testing: May 20 17:56 EDT
