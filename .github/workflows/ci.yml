@@ -6,63 +6,44 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
       with:
-        submodules: recursive
+        submodules: true
     
-    - name: Install dependencies
+    - name: Install
       run: |
         sudo apt-get update
         sudo apt-get install -y lcov g++-10 cmake
     
-    - name: Build with coverage
+    - name: Configure
       run: |
         rm -rf build
-        mkdir build && cd build
-        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+        mkdir build
+        cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage"
+    
+    - name: Build
+      run: |
+        cd build
         make -j2
     
-    - name: Run tests
+    - name: Test
       run: |
         cd build
         ./banking_tests
     
-    - name: Generate coverage
+    - name: Coverage collect
       run: |
         cd build
         lcov --capture --directory . --output-file coverage.info --no-external
         lcov --remove coverage.info '*/third-party/*' -o coverage.info
         lcov --remove coverage.info '*/tests/*' -o coverage.info
-        lcov --remove coverage.info '/usr/*' -o coverage.info
     
-    - name: Show coverage
+    - name: Coverage check
       run: |
         cd build
-        echo "=== Coverage Report ==="
-        lcov --summary coverage.info 2>&1 || true
-        echo ""
-        lcov --list coverage.info 2>&1 | head -30
-    
-    - name: Verify 100%
-      run: |
-        cd build
-        # Проверяем Account.cpp
-        if lcov --list coverage.info 2>&1 | grep "banking/Account.cpp" | grep -q "100.0%"; then
-          echo "✅ Account.cpp: 100% coverage"
-        else
-          echo "❌ Account.cpp coverage not 100%"
-          lcov --list coverage.info 2>&1 | grep "Account.cpp"
-          exit 1
-        fi
-        
-        # Проверяем Transaction.cpp
-        if lcov --list coverage.info 2>&1 | grep "banking/Transaction.cpp" | grep -q "100.0%"; then
-          echo "✅ Transaction.cpp: 100% coverage"
-        else
-          echo "❌ Transaction.cpp coverage not 100%"
-          lcov --list coverage.info 2>&1 | grep "Transaction.cpp"
-          exit 1
-        fi
-        
-        echo ""
-        echo "🎉🎉🎉 SUCCESS: 100% code coverage! 🎉🎉🎉"
+        lcov --list coverage.info
+        lcov --list coverage.info | grep "banking/Account.cpp" | grep "100.0%"
+        lcov --list coverage.info | grep "banking/Transaction.cpp" | grep "100.0%"
+        echo "🎉 100% coverage!"
