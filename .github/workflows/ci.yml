@@ -8,21 +8,34 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install
-      run: sudo apt-get update && sudo apt-get install -y g++-10 cmake
-      run: pip3 install gcovr
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++-10 cmake python3-pip
+        pip3 install gcovr
     
-    - name: Build & test
+    - name: Build and test
       run: |
         mkdir build && cd build
         cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage"
-        make && ./banking_tests
+        make -j2
+        ./banking_tests
         cd ..
     
-    - name: Coverage
+    - name: Generate coverage report
       run: |
         cd build
         gcovr --root .. --filter '.*/banking/.*\.cpp' --exclude '.*/tests/.*' --exclude '.*/_deps/.*' --txt
-        gcovr --root .. --filter '.*/banking/Account.cpp' --txt | grep "100%"
-        gcovr --root .. --filter '.*/banking/Transaction.cpp' --txt | grep "100%"
-        echo "✅ 100% coverage!"
+    
+    - name: Check Account.cpp
+      run: |
+        cd build
+        gcovr --root .. --filter '.*/banking/Account.cpp' --txt | grep -q "100%"
+    
+    - name: Check Transaction.cpp
+      run: |
+        cd build
+        gcovr --root .. --filter '.*/banking/Transaction.cpp' --txt | grep -q "100%"
+    
+    - name: Success message
+      run: echo "✅ 100% coverage achieved!"
