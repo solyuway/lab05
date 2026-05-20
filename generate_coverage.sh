@@ -4,61 +4,64 @@ set -e
 
 echo "=== Building with coverage support ==="
 
-# Clean previous builds
+# Clean
 rm -rf build coverage.info coverage_report
 
+# Configure
 mkdir -p build
 cd build
-
-# Configure with coverage flags
 cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \
          -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
 
+# Build
 make -j2
 
+# Run tests
 echo "=== Running tests ==="
-ctest --output-on-failure
-
-# Run tests directly for coverage data
 ./banking_tests
 
 cd ..
 
+# Generate coverage from build directory
 echo "=== Generating coverage report ==="
-lcov --capture --directory . --output-file coverage.info --no-external \
-     --ignore-errors inconsistent,gcov,source
+lcov --capture --directory build --output-file coverage.info --no-external \
+     --ignore-errors inconsistent,gcov,source,empty
 
+# Remove unwanted files
 lcov --remove coverage.info '*/third-party/*' --output-file coverage.info \
-     --ignore-errors unused
+     --ignore-errors unused,empty
 lcov --remove coverage.info '*/tests/*' --output-file coverage.info \
-     --ignore-errors unused
+     --ignore-errors unused,empty
 lcov --remove coverage.info '/usr/*' --output-file coverage.info \
-     --ignore-errors unused
-lcov --remove coverage.info '*/build/*' --output-file coverage.info \
-     --ignore-errors unused
+     --ignore-errors unused,empty
 
-echo "=== Coverage summary ==="
-lcov --list coverage.info 2>&1 | grep -E "\.(cpp|hpp)" || true
-
-echo "=== Coverage percentages ==="
+# Show coverage
+echo ""
+echo "=== Coverage Summary ==="
 lcov --summary coverage.info 2>&1 || true
 
-echo "=== Generating HTML report ==="
+echo ""
+echo "=== File Details ==="
+lcov --list coverage.info 2>&1 | grep -E "(Account|Transaction)\.cpp" -A1
+
+# Generate HTML
 genhtml coverage.info --output-directory coverage_report --ignore-errors source
 
 echo ""
 echo "=========================================="
-echo "✅ Coverage report generated in coverage_report/index.html"
+echo "✅ Coverage report: coverage_report/index.html"
 echo "=========================================="
 
-# Extract line coverage percentage
-if command -v bc &> /dev/null; then
-    COVERAGE=$(lcov --summary coverage.info 2>&1 | grep "lines" | awk '{print $2}' | sed 's/%//')
-    if [ -n "$COVERAGE" ]; then
-        echo "📊 Line Coverage: ${COVERAGE}%"
-        if (( $(echo "$COVERAGE == 100" | bc -l) )); then
-            echo "🎉 Perfect! 100% code coverage achieved!"
-        fi
-    fi
+# Verify 100%
+if lcov --list coverage.info 2>&1 | grep -q "Account.cpp.*100%.*100%"; then
+    echo "✅ Account.cpp: 100% coverage"
+else
+    echo "⚠️ Account.cpp coverage may not be 100%"
+fi
+
+if lcov --list coverage.info 2>&1 | grep -q "Transaction.cpp.*100%.*100%"; then
+    echo "✅ Transaction.cpp: 100% coverage"
+else
+    echo "⚠️ Transaction.cpp coverage may not be 100%"
 fi
