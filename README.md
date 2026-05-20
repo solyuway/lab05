@@ -1,42 +1,27 @@
-# Lab05 - Banking Library with 100% Test Coverage
+# Lab05 - Banking Library with GTest and Mock Objects
 
-[![CI with Coverage](https://github.com/${GITHUB_USERNAME}/lab05/actions/workflows/ci.yml/badge.svg)](https://github.com/${GITHUB_USERNAME}/lab05/actions/workflows/ci.yml)
-[![Coverage Status](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://${GITHUB_USERNAME}.github.io/lab05/coverage/)
-
-## 📊 Coverage Report
-
-[![Coverage Report](https://img.shields.io/badge/📊-View%20Coverage%20Report-blue)](https://${GITHUB_USERNAME}.github.io/lab05/coverage/)
-
-**Current coverage: 100%** ✅
+## 📊 Code Coverage: 100% ✅
 
 | File | Lines | Functions |
 |------|-------|-----------|
-| Account.cpp | 100% (18/18) | 100% (5/5) |
-| Transaction.cpp | 100% (23/23) | 100% (3/3) |
+| `banking/Account.cpp` | 100% (18/18) | 100% (5/5) |
+| `banking/Transaction.cpp` | 100% (23/23) | 100% (3/3) |
+| **Total** | **100% (41/41)** | **100% (8/8)** |
 
-## Описание
+## 🧪 Test Results
 
-Библиотека banking с классами `Account` и `Transaction`.  
-Модульные тесты с использованием Google Test и Google Mock.  
-**Покрытие кода: 100%**
+- **Total tests:** 13
+- **Passed:** 13 (100%)
+- **Failed:** 0
 
-## 📋 Требования
-
-- CMake >= 3.10
-- C++14 компилятор
-- lcov и genhtml (для отчёта о покрытии)
-
-## 🔧 Сборка и тестирование
+## 🔧 Build and Test
 
 ```bash
-# Клонирование с submodules
+# Clone with submodules
 git clone --recursive https://github.com/${GITHUB_USERNAME}/lab05
 cd lab05
 
-# Сборка с тестами
+# Build and test
 mkdir build && cd build
 cmake .. -DBUILD_TESTS=ON
-make
-
-# Запуск тестов
-ctest --output-on-failure
+make && ./banking_tests
