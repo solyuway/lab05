@@ -1,0 +1,41 @@
+language: cpp
+dist: focal
+
+addons:
+  apt:
+    packages:
+      - lcov
+      - g++-9
+
+env:
+  global:
+    - COVERAGE_FILE=coverage.info
+
+before_script:
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 90
+  - sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-9 90
+
+script:
+  - mkdir -p build
+  - cd build
+  - cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+  - cmake --build . -- -j2
+  - ctest --output-on-failure
+
+after_success:
+  - cd ${TRAVIS_BUILD_DIR}
+  - lcov --capture --directory . --output-file coverage.info --no-external
+  - lcov --remove coverage.info '/usr/*' --output-file coverage.info
+  - lcov --remove coverage.info '*/third-party/*' --output-file coverage.info
+  - lcov --remove coverage.info '*/tests/*' --output-file coverage.info
+  - lcov --list coverage.info
+  - genhtml coverage.info --output-directory coverage_report
+  - echo "Coverage report generated in coverage_report/"
+
+deploy:
+  provider: pages
+  skip_cleanup: true
+  github_token: $GITHUB_TOKEN
+  local_dir: coverage_report
+  on:
+    branch: master
