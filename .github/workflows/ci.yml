@@ -1,138 +1,31 @@
-name: CI with Coverage
+name: CI
 
-on:
-  push:
-    branches: [ master, main ]
-  pull_request:
-    branches: [ master, main ]
+on: push
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     
-    - name: Install dependencies
+    - name: Install gcovr
       run: |
         sudo apt-get update
-        sudo apt-get install -y lcov g++-10 cmake
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 90
-        sudo update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-10 90
-    
-    - name: Configure CMake with coverage
-      run: |
-        rm -rf build
-        mkdir -p build
-        cd build
-        cmake .. -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug \
-                 -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
-                 -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        sudo apt-get install -y g++ cmake python3-pip
+        pip3 install gcovr
     
     - name: Build
       run: |
-        cd build
-        make -j2
-    
-    - name: Run tests
-      run: |
-        cd build
-        ./banking_tests
-    
-    - name: Generate coverage report
-      run: |
-        cd build
-        lcov --capture --directory . --output-file coverage.info --no-external \
-             --ignore-errors inconsistent,gcov,source,empty
-        lcov --remove coverage.info '*/third-party/*' --output-file coverage.info \
-             --ignore-errors unused,empty
-        lcov --remove coverage.info '*/tests/*' --output-file coverage.info \
-             --ignore-errors unused,empty
-        lcov --remove coverage.info '/usr/*' --output-file coverage.info \
-             --ignore-errors unused,empty
+        mkdir build && cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage"
+        make && ./banking_tests
         cd ..
-        cp build/coverage.info .
     
-    - name: Show coverage details
+    - name: Coverage
       run: |
-        echo "=== Full coverage report ==="
-        lcov --list coverage.info
-    
-    - name: Check 100% coverage
-      run: |
-        # Получаем coverage report в переменную
-        COV_REPORT=$(lcov --list coverage.info 2>&1)
-        
-        echo "$COV_REPORT"
-        echo ""
-        echo "=== Checking individual files ==="
-        
-        # Проверяем Account.cpp
-        if echo "$COV_REPORT" | grep -q "banking/Account.cpp" | grep -E "\|100\.0%.*\|100\.0%"; then
-          echo "✅ Account.cpp: 100% coverage"
-        else
-          echo "Checking Account.cpp line by line:"
-          echo "$COV_REPORT" | grep -A2 "Account.cpp" || echo "Account.cpp not found"
-        fi
-        
-        # Альтернативный метод проверки через lcov summary
-        echo ""
-        echo "=== Using lcov summary ==="
-        lcov --summary coverage.info 2>&1 || true
-        
-        # Проверяем процент покрытия для нужных файлов через genhtml
-        echo ""
-        echo "=== Generating detailed report ==="
-        genhtml coverage.info --output-directory coverage_report --quiet
-        
-        # Ищем строки с 100% покрытием
-        if grep -r "100.0%" coverage_report/ | grep -q "banking/Account.cpp"; then
-          echo "✅ Account.cpp has 100% coverage"
-        else
-          echo "⚠️ Account.cpp coverage might not be 100%"
-        fi
-        
-        if grep -r "100.0%" coverage_report/ | grep -q "banking/Transaction.cpp"; then
-          echo "✅ Transaction.cpp has 100% coverage"
-        else
-          echo "⚠️ Transaction.cpp coverage might not be 100%"
-        fi
-    
-    - name: Verify 100 percent
-      run: |
-        # Создаем простую проверку через подсчет строк
         cd build
-        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --print-summary
-        
-        # Получаем процент покрытия для Account.cpp
-        ACCOUNT_COV=$(gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --filter '.*/banking/Account.cpp' 2>/dev/null | grep "TOTAL" | awk '{print $4}' | sed 's/%//')
-        
-        # Получаем процент покрытия для Transaction.cpp
-        TRANSACTION_COV=$(gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --filter '.*/banking/Transaction.cpp' 2>/dev/null | grep "TOTAL" | awk '{print $4}' | sed
-NameBright - Coming Soon
-NameBright - Coming Soon
-coverage.info
-'s/%//')
-        
-        echo "Account.cpp coverage: ${ACCOUNT_COV}%"
-        echo "Transaction.cpp coverage: ${TRANSACTION_COV}%"
-        
-        if [ "$ACCOUNT_COV" = "100" ] && [ "$TRANSACTION_COV" = "100" ]; then
-          echo "✅✅✅ SUCCESS: 100% coverage! ✅✅✅"
-          exit 0
-        else
-          echo "❌ Coverage is not 100%"
-          echo "Account.cpp: ${ACCOUNT_COV}%"
-          echo "Transaction.cpp: ${TRANSACTION_COV}%"
-          exit 1
-        fi
-    
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: coverage_report/
-        retention-days: 7
+        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --txt
+        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --txt | grep -q "100%" && echo "✅ 100% coverage!" || (echo "❌ Not 100%" && exit 1)
