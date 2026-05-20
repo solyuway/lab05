@@ -37,57 +37,98 @@ jobs:
         cd build
         make -j2
     
-    - name: Run tests and generate coverage data
+    - name: Run tests
       run: |
         cd build
         ./banking_tests
-        cd ..
     
     - name: Generate coverage report
       run: |
-        lcov --capture --directory build --output-file coverage.info \
-             --no-external --ignore-errors inconsistent,gcov,source,empty
+        cd build
+        lcov --capture --directory . --output-file coverage.info --no-external \
+             --ignore-errors inconsistent,gcov,source,empty
         lcov --remove coverage.info '*/third-party/*' --output-file coverage.info \
              --ignore-errors unused,empty
         lcov --remove coverage.info '*/tests/*' --output-file coverage.info \
              --ignore-errors unused,empty
         lcov --remove coverage.info '/usr/*' --output-file coverage.info \
              --ignore-errors unused,empty
-        lcov --remove coverage.info '*/build/_deps/*' --output-file coverage.info \
-             --ignore-errors unused,empty
+        cd ..
+        cp build/coverage.info .
     
-    - name: Show coverage summary
+    - name: Show coverage details
       run: |
-        echo "=== Coverage Report ==="
+        echo "=== Full coverage report ==="
+        lcov --list coverage.info
+    
+    - name: Check 100% coverage
+      run: |
+        # Получаем coverage report в переменную
+        COV_REPORT=$(lcov --list coverage.info 2>&1)
+        
+        echo "$COV_REPORT"
+        echo ""
+        echo "=== Checking individual files ==="
+        
+        # Проверяем Account.cpp
+        if echo "$COV_REPORT" | grep -q "banking/Account.cpp" | grep -E "\|100\.0%.*\|100\.0%"; then
+          echo "✅ Account.cpp: 100% coverage"
+        else
+          echo "Checking Account.cpp line by line:"
+          echo "$COV_REPORT" | grep -A2 "Account.cpp" || echo "Account.cpp not found"
+        fi
+        
+        # Альтернативный метод проверки через lcov summary
+        echo ""
+        echo "=== Using lcov summary ==="
         lcov --summary coverage.info 2>&1 || true
+        
+        # Проверяем процент покрытия для нужных файлов через genhtml
         echo ""
-        echo "=== Account.cpp ==="
-        lcov --list coverage.info 2>&1 | grep "Account.cpp" -A1 || true
-        echo ""
-        echo "=== Transaction.cpp ==="
-        lcov --list coverage.info 2>&1 | grep "Transaction.cpp" -A1 || true
+        echo "=== Generating detailed report ==="
+        genhtml coverage.info --output-directory coverage_report --quiet
+        
+        # Ищем строки с 100% покрытием
+        if grep -r "100.0%" coverage_report/ | grep -q "banking/Account.cpp"; then
+          echo "✅ Account.cpp has 100% coverage"
+        else
+          echo "⚠️ Account.cpp coverage might not be 100%"
+        fi
+        
+        if grep -r "100.0%" coverage_report/ | grep -q "banking/Transaction.cpp"; then
+          echo "✅ Transaction.cpp has 100% coverage"
+        else
+          echo "⚠️ Transaction.cpp coverage might not be 100%"
+        fi
     
-    - name: Check 100 percent coverage
+    - name: Verify 100 percent
       run: |
-        ACCOUNT_COV=$(lcov --list coverage.info 2>&1 | grep "banking/Account.cpp" | awk '{print $2}' | sed 's/%//' || echo "0")
-        TRANSACTION_COV=$(lcov --list coverage.info 2>&1 | grep "banking/Transaction.cpp" | awk '{print $2}' | sed 's/%//' || echo "0")
+        # Создаем простую проверку через подсчет строк
+        cd build
+        gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --print-summary
+        
+        # Получаем процент покрытия для Account.cpp
+        ACCOUNT_COV=$(gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --filter '.*/banking/Account.cpp' 2>/dev/null | grep "TOTAL" | awk '{print $4}' | sed 's/%//')
+        
+        # Получаем процент покрытия для Transaction.cpp
+        TRANSACTION_COV=$(gcovr --root .. --exclude '.*/third-party/.*' --exclude '.*/tests/.*' --filter '.*/banking/Transaction.cpp' 2>/dev/null | grep "TOTAL" | awk '{print $4}' | sed
+NameBright - Coming Soon
+NameBright - Coming Soon
+coverage.info
+'s/%//')
         
         echo "Account.cpp coverage: ${ACCOUNT_COV}%"
         echo "Transaction.cpp coverage: ${TRANSACTION_COV}%"
         
         if [ "$ACCOUNT_COV" = "100" ] && [ "$TRANSACTION_COV" = "100" ]; then
-          echo "✅✅✅ SUCCESS: Both files have 100% coverage! ✅✅✅"
+          echo "✅✅✅ SUCCESS: 100% coverage! ✅✅✅"
+          exit 0
         else
           echo "❌ Coverage is not 100%"
           echo "Account.cpp: ${ACCOUNT_COV}%"
           echo "Transaction.cpp: ${TRANSACTION_COV}%"
           exit 1
         fi
-    
-    - name: Generate HTML report
-      run: |
-        genhtml coverage.info --output-directory coverage_report \
-               --ignore-errors source,corrupt,empty
     
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
