@@ -2,7 +2,7 @@ name: CI
 on: push
 
 jobs:
-  coverage:
+  test:
     runs-on: ubuntu-latest
     
     steps:
@@ -10,77 +10,59 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Install tools
+    - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y g++ cmake python3-pip lcov
-        pip3 install gcovr
+        sudo apt-get install -y lcov g++-10 cmake
     
     - name: Build with coverage
       run: |
         rm -rf build
-        mkdir -p build
-        cd build
-        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage -O0 -g" \
-                 -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        mkdir build && cd build
+        cmake .. -DBUILD_TESTS=ON -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
         make -j2
     
     - name: Run tests
       run: |
         cd build
         ./banking_tests
-        # Показываем где находятся .gcda файлы
-        find . -name "*.gcda" -ls
     
-    - name: Generate coverage report
+    - name: Generate coverage
       run: |
         cd build
-        # Запускаем gcovr из директории build, указывая корень проекта
-        gcovr --root .. \
-              --gcov-executable gcov-10 \
-              --exclude '.*/third-party/.*' \
-              --exclude '.*/tests/.*' \
-              --exclude '.*/build/.*' \
-              --txt
-        # Сохраняем результат в переменную
-        gcovr --root .. \
-              --gcov-executable gcov-10 \
-              --exclude '.*/third-party/.*' \
-              --exclude '.*/tests/.*' \
-              --exclude '.*/build/.*' \
-              --txt > coverage.txt
-        cat coverage.txt
+        lcov --capture --directory . --output-file coverage.info --no-external
+        lcov --remove coverage.info '*/third-party/*' -o coverage.info
+        lcov --remove coverage.info '*/tests/*' -o coverage.info
+        lcov --remove coverage.info '/usr/*' -o coverage.info
     
-    - name: Check 100% coverage
+    - name: Show coverage
       run: |
         cd build
-        # Получаем процент покрытия из отчета
-        COVERAGE=$(gcovr --root .. \
-                        --gcov-executable gcov-10 \
-                        --exclude '.*/third-party/.*' \
-                        --exclude '.*/tests/.*' \
-                        --exclude '.*/build/.*' \
-                        --txt | grep "TOTAL" | awk '{print $4}' | sed 's/%//')
-        
-        echo "Total coverage: ${COVERAGE}%"
-        
-        # Получаем покрытие для каждого файла
-        gcovr --root .. \
-              --gcov-executable gcov-10 \
-              --filter '.*/banking/Account.cpp' \
-              --txt
-        
-        gcovr --root .. \
-              --gcov-executable gcov-10 \
-              --filter '.*/banking/Transaction.cpp' \
-              --txt
-        
-        # Проверяем что покрытие 100%
-        if [ "$COVERAGE" = "100" ]; then
-          echo "✅✅✅ Success: 100% code coverage! ✅✅✅"
-          exit 0
+        echo "=== Coverage Report ==="
+        lcov --summary coverage.info 2>&1 || true
+        echo ""
+        lcov --list coverage.info 2>&1 | head -30
+    
+    - name: Verify 100%
+      run: |
+        cd build
+        # Проверяем Account.cpp
+        if lcov --list coverage.info 2>&1 | grep "banking/Account.cpp" | grep -q "100.0%"; then
+          echo "✅ Account.cpp: 100% coverage"
         else
-          echo "❌ Coverage is ${COVERAGE}%, expected 100%"
+          echo "❌ Account.cpp coverage not 100%"
+          lcov --list coverage.info 2>&1 | grep "Account.cpp"
           exit 1
         fi
-
+        
+        # Проверяем Transaction.cpp
+        if lcov --list coverage.info 2>&1 | grep "banking/Transaction.cpp" | grep -q "100.0%"; then
+          echo "✅ Transaction.cpp: 100% coverage"
+        else
+          echo "❌ Transaction.cpp coverage not 100%"
+          lcov --list coverage.info 2>&1 | grep "Transaction.cpp"
+          exit 1
+        fi
+        
+        echo ""
+        echo "🎉🎉🎉 SUCCESS: 100% code coverage! 🎉🎉🎉"

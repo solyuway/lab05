@@ -4,11 +4,13 @@ project(banking VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Флаги компиляции (без -Werror)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 
+# Опции сборки
 option(BUILD_TESTS "Build tests" OFF)
-option(ENABLE_COVERAGE "Enable coverage" OFF)
 
+# Библиотека banking
 add_library(banking STATIC
     banking/Account.cpp
     banking/Transaction.cpp
@@ -18,11 +20,7 @@ target_include_directories(banking PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-if(ENABLE_COVERAGE)
-    target_compile_options(banking PRIVATE --coverage -O0 -g)
-    target_link_options(banking PRIVATE --coverage)
-endif()
-
+# Установка
 install(TARGETS banking DESTINATION lib)
 install(FILES 
     banking/Account.hpp 
@@ -30,11 +28,22 @@ install(FILES
     DESTINATION include/banking
 )
 
+# Тесты
 if(BUILD_TESTS)
     enable_testing()
     
+    # Добавляем Google Test с подавлением предупреждений
     add_subdirectory(third-party/gtest)
     
+    # Отключаем -Werror для Google Test
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(gtest PRIVATE -Wno-error)
+        target_compile_options(gtest_main PRIVATE -Wno-error)
+        target_compile_options(gmock PRIVATE -Wno-error)
+        target_compile_options(gmock_main PRIVATE -Wno-error)
+    endif()
+    
+    # Добавляем тесты
     file(GLOB TEST_SOURCES tests/*.cpp)
     add_executable(banking_tests ${TEST_SOURCES})
     
@@ -51,10 +60,9 @@ if(BUILD_TESTS)
         pthread
     )
     
-    if(ENABLE_COVERAGE)
-        target_compile_options(banking_tests PRIVATE --coverage -O0 -g)
-        target_link_options(banking_tests PRIVATE --coverage)
-    endif()
+    # Добавляем coverage флаги
+    target_compile_options(banking_tests PRIVATE --coverage -O0 -g)
+    target_link_options(banking_tests PRIVATE --coverage)
     
     add_test(NAME BankingTests COMMAND banking_tests)
 endif()
