@@ -41,17 +41,12 @@ jobs:
       run: |
         cd build
         ./banking_tests
-        # .gcda and .gcno files are created in build/CMakeFiles/banking_tests.dir/tests/
-        ls -la CMakeFiles/banking_tests.dir/tests/ || true
         cd ..
     
     - name: Generate coverage report
       run: |
-        # Run lcov from root, pointing to build directory
         lcov --capture --directory build --output-file coverage.info \
              --no-external --ignore-errors inconsistent,gcov,source,empty
-        
-        # Remove unwanted files
         lcov --remove coverage.info '*/third-party/*' --output-file coverage.info \
              --ignore-errors unused,empty
         lcov --remove coverage.info '*/tests/*' --output-file coverage.info \
@@ -60,40 +55,32 @@ jobs:
              --ignore-errors unused,empty
         lcov --remove coverage.info '*/build/_deps/*' --output-file coverage.info \
              --ignore-errors unused,empty
-        
-        # Show coverage
-        echo "=== Coverage Report ==="
-        lcov --list coverage.info 2>&1 | head -30
     
-    - name: Check coverage percentage
+    - name: Show coverage summary
       run: |
-        # Extract coverage percentage
-        COVERAGE=$(lcov --summary coverage.info 2>&1 | grep "lines" | awk '{print $2}' | sed 's/%//' || echo "0")
-        echo "📊 Line Coverage: ${COVERAGE}%"
-        
-        # Check specific files
+        echo "=== Coverage Report ==="
+        lcov --summary coverage.info 2>&1 || true
         echo ""
-        echo "=== File-by-file coverage ==="
-        for file in banking/Account.cpp banking/Transaction.cpp; do
-          if [ -f "$file" ]; then
-            COV=$(lcov --list coverage.info 2>&1 | grep "$file" | awk '{print $2}')
-            echo "$file: ${COV:-0%}"
-          fi
-        done
-        
-        # Verify 100% coverage for source files
+        echo "=== Account.cpp ==="
+        lcov --list coverage.info 2>&1 | grep "Account.cpp" -A1 || true
+        echo ""
+        echo "=== Transaction.cpp ==="
+        lcov --list coverage.info 2>&1 | grep "Transaction.cpp" -A1 || true
+    
+    - name: Check 100 percent coverage
+      run: |
         ACCOUNT_COV=$(lcov --list coverage.info 2>&1 | grep "banking/Account.cpp" | awk '{print $2}' | sed 's/%//' || echo "0")
         TRANSACTION_COV=$(lcov --list coverage.info 2>&1 | grep "banking/Transaction.cpp" | awk '{print $2}' | sed 's/%//' || echo "0")
         
-        echo ""
+        echo "Account.cpp coverage: ${ACCOUNT_COV}%"
+        echo "Transaction.cpp coverage: ${TRANSACTION_COV}%"
+        
         if [ "$ACCOUNT_COV" = "100" ] && [ "$TRANSACTION_COV" = "100" ]; then
-          echo "✅✅✅ SUCCESS: Both Account.cpp and Transaction.cpp have 100% coverage! ✅✅✅"
-          echo "   Account.cpp: ${ACCOUNT_COV}%"
-          echo "   Transaction.cpp: ${TRANSACTION_COV}%"
+          echo "✅✅✅ SUCCESS: Both files have 100% coverage! ✅✅✅"
         else
-          echo "⚠️ Coverage not 100%:"
-          echo "   Account.cpp: ${ACCOUNT_COV}%"
-          echo "   Transaction.cpp: ${TRANSACTION_COV}%"
+          echo "❌ Coverage is not 100%"
+          echo "Account.cpp: ${ACCOUNT_COV}%"
+          echo "Transaction.cpp: ${TRANSACTION_COV}%"
           exit 1
         fi
     
@@ -102,28 +89,9 @@ jobs:
         genhtml coverage.info --output-directory coverage_report \
                --ignore-errors source,corrupt,empty
     
-    - name: Upload coverage report as artifact
+    - name: Upload coverage report
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
         path: coverage_report/
         retention-days: 7
-    
-    - name: Upload coverage data as artifact
-      uses: actions/upload-artifact@v4
-NameBright - Coming Soon
-NameBright - Coming Soon
-coverage.info
-with:
-        name: coverage-data
-        path: coverage.info
-        retention-days: 7
-    
-    - name: Display test results
-      run: |
-        echo ""
-        echo "=== Test Results Summary ==="
-        echo "✅ All 13 tests passed!"
-        echo "✅ Account class: 6 tests"
-        echo "✅ Transaction class: 5 tests"
-        echo "✅ Mock tests: 2 tests"
